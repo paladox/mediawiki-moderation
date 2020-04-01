@@ -22,9 +22,10 @@
 
 namespace MediaWiki\Moderation;
 
-use MediaWiki\MediaWikiServices;
+use ModerationApproveHook;
 use Title;
 use User;
+use Wikimedia\Assert\Assert;
 
 class InstallApproveHookConsequence implements IConsequence {
 	/** @var Title */
@@ -56,9 +57,10 @@ class InstallApproveHookConsequence implements IConsequence {
 
 	/**
 	 * Execute the consequence.
+	 * @param ModerationApproveHook|null $approveHook
 	 */
-	public function run() {
-		$approveHook = MediaWikiServices::getInstance()->getService( 'Moderation.ApproveHook' );
+	public function run( ModerationApproveHook $approveHook = null ) {
+		Assert::invariant( $approveHook !== null, 'approveHook must not be null' );
 		$approveHook->addTask( $this->title, $this->user, $this->type, $this->task );
 	}
 }

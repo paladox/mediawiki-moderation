@@ -26,6 +26,7 @@ interface IConsequenceManager {
 	/**
 	 * Add a new consequence that must be executed.
 	 * @param IConsequence $consequence
+	 * @param object ...$injectedDependencies These will be passed to run() as arguments.
 	 */
-	public function add( IConsequence $consequence );
+	public function add( IConsequence $consequence, ...$injectedDependencies );
 }

@@ -109,7 +109,7 @@ abstract class ModerationApprovableEntry extends ModerationEntry {
 				# without the edits surprisingly appearing somewhere in the past.
 				'timestamp' => $row->timestamp
 			]
-		) );
+		), $this->approveHook );
 	}
 
 	/**

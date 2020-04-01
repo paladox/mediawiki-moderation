@@ -23,7 +23,11 @@
 namespace MediaWiki\Moderation;
 
 class ConsequenceManager implements IConsequenceManager {
-	public function add( IConsequence $consequence ) {
-		return $consequence->run();
+	/**
+	 * @inheritDoc
+	 */
+	public function add( IConsequence $consequence, ...$injectedDependencies ) {
+		// @phan-suppress-next-line PhanParamTooManyUnpack
+		return $consequence->run( ...$injectedDependencies );
 	}
 }

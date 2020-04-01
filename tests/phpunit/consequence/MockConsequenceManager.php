@@ -40,9 +40,10 @@ class MockConsequenceManager implements IConsequenceManager {
 	/**
 	 * Mocked version of add(): record the Consequence without running it, return mocked result.
 	 * @param IConsequence $consequence
+	 * @param object ...$injectedDependencies @phan-unused-param
 	 * @return mixed|null Mocked return value (if mockResult() was used before add()), if any.
 	 */
-	public function add( IConsequence $consequence ) {
+	public function add( IConsequence $consequence, ...$injectedDependencies ) {
 		$this->consequences[] = $consequence;
 
 		// Return the mocked return value (if any).

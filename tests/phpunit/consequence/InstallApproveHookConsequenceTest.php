@@ -20,6 +20,7 @@
  * Unit test of InstallApproveHookConsequence.
  */
 
+use MediaWiki\MediaWikiServices;
 use MediaWiki\Moderation\InstallApproveHookConsequence;
 
 require_once __DIR__ . "/autoload.php";
@@ -532,13 +533,16 @@ class InstallApproveHookConsequenceTest extends ModerationUnitTestCase {
 			RequestContext::getMain()->setRequest( new FauxRequest() );
 		}
 
+		// This parameter is provided to InstallApproveHookConsequence via Dependency Injection
+		$approveHook = MediaWikiServices::getInstance()->getService( 'Moderation.ApproveHook' );
+
 		// Step 1: run InstallApproveHookConsequence (tested class) to install ApproveHook.
 		foreach ( $todo as $testParameters ) {
 			list( $title, $user, $type, $task ) = $testParameters;
 			if ( $task ) {
 				// Create and run the Consequence.
 				$consequence = new InstallApproveHookConsequence( $title, $user, $type, $task );
-				$consequence->run();
+				$consequence->run( $approveHook );
 			}
 		}
 

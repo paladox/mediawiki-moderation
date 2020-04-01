@@ -41,6 +41,8 @@ namespace MediaWiki\Moderation;
  * doesn't need to be invoked, then it shouldn't be added to ConsequenceManager to begin with.
  * 7) Parameters must be easily comparable/serializable. Title and User are acceptable, but complex
  * and difficult-to-construct objects like EditPage or ContextSource can't be parameters.
+ *
+ * The only parameters allowed in run() are service-like objects for Dependencies Injection.
  */
 interface IConsequence {
 	/**
