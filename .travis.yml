@@ -152,7 +152,7 @@ matrix:
 
    # Optional: use PHPUnit to calculate code coverage of consequence tests
     - <<: *phpunit-build
-      if: branch IN (phpunit,coverage)
+      if: branch IN (phpunit,coverage,ServiceWiring-class)
       env: TESTSUITE_TYPE=coverage branch=REL1_34
       php: 7.3
       script:

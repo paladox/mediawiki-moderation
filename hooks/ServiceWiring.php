@@ -20,14 +20,26 @@
  * Register services like ActionFactory in MediaWikiServices container.
  */
 
+namespace MediaWiki\Moderation;
+
 use MediaWiki\Logger\LoggerFactory;
 use MediaWiki\MediaWikiServices;
-use MediaWiki\Moderation\ActionFactory;
-use MediaWiki\Moderation\ActionLinkRenderer;
-use MediaWiki\Moderation\ConsequenceManager;
-use MediaWiki\Moderation\EditFormOptions;
-use MediaWiki\Moderation\EntryFactory;
-use MediaWiki\Moderation\TimestampFormatter;
+use ModerationApproveHook;
+use ModerationCanSkip;
+use ModerationNotifyModerator;
+use ModerationPreload;
+use RequestContext;
+use SpecialPage;
+
+//phpcs:disable
+if ( !class_exists( ServiceWiring::class ) ) {
+class ServiceWiring {
+	/**
+	 * @return array
+	 * @phan-return array<string,(Closure(MediaWikiServices):mixed)>
+	 */
+	public static function getWiringData() {
+//phpcs:enable
 
 return [
 	'Moderation.ActionFactory' => function ( MediaWikiServices $services ) : ActionFactory {
@@ -74,13 +86,13 @@ return [
 		);
 	},
 	'Moderation.NotifyModerator' =>
-	function ( MediaWikiServices $services ) : ModerationNotifyModerator {
-		return new ModerationNotifyModerator(
-			$services->getLinkRenderer(),
-			$services->getService( 'Moderation.EntryFactory' ),
-			wfGetMainCache()
-		);
-	},
+		function ( MediaWikiServices $services ) : ModerationNotifyModerator {
+			return new ModerationNotifyModerator(
+				$services->getLinkRenderer(),
+				$services->getService( 'Moderation.EntryFactory' ),
+				wfGetMainCache()
+			);
+		},
 	'Moderation.Preload' => function ( MediaWikiServices $services ) : ModerationPreload {
 		return new ModerationPreload(
 			$services->getService( 'Moderation.EntryFactory' ),
@@ -90,4 +102,13 @@ return [
 	'Moderation.TimestampFormatter' => function () : TimestampFormatter {
 		return new TimestampFormatter();
 	},
+
+// @codeCoverageIgnoreStart
 ];
+// @codeCoverageIgnoreEnd
+
+//phpcs:disable
+} } }
+//phpcs:enable
+
+return ServiceWiring::getWiringData();
