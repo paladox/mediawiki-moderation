@@ -116,12 +116,11 @@ class ModerationNotifyModeratorTest extends ModerationUnitTestCase {
 	 * Check the handler of "GetNewMessagesAlert" hook (which is called by MediaWiki core).
 	 * @param array $newtalks Parameter of GetNewMessagesAlert hook.
 	 * @param bool $expectShown If true, our notification is expected to be shown.
-	 * @param bool|null $thirdPartyHookResult If not null, another hook handler will return this value.
 	 * @dataProvider dataProviderNotifyHook
 	 *
 	 * @covers ModerationNotifyModerator
 	 */
-	public function testNotifyHook( array $newtalks, $expectShown, $thirdPartyHookResult ) {
+	public function testNotifyHook( array $newtalks, $expectShown ) {
 		$linkRenderer = $this->createMock( LinkRenderer::class );
 		$entryFactory = $this->createMock( EntryFactory::class );
 		$user = $this->createMock( User::class );
@@ -153,45 +152,18 @@ class ModerationNotifyModeratorTest extends ModerationUnitTestCase {
 
 		$newMessagesAlert = '{AnotherExistingNotification}';
 
-		if ( $thirdPartyHookResult !== null ) {
-			// Install third-party handler of GetNewMessagesAlert hook,
-			// simulating situation when another extension (like Echo) has such a handler.
-			$hookArgs = [ &$newMessagesAlert, $newtalks, $user, $out ];
-			$this->setTemporaryHook( ModerationNotifyModerator::SAVED_HOOK_NAME,
-				function ( &$newMessagesAlert2, array $newtalks2,
-					User $user2, OutputPage $out2 ) use ( $hookArgs, $thirdPartyHookResult )
-				{
-					$this->assertSame( $hookArgs[0], $newMessagesAlert2 );
-					$this->assertSame( $hookArgs[1], $newtalks2 );
-					$this->assertSame( $hookArgs[2], $user2 );
-					$this->assertSame( $hookArgs[3], $out2 );
-
-					$newMessagesAlert2 = '{Notification From Third-Party Hook}';
-
-					// Additionally test that return value of this third-party hook
-					// is returned by ModerationNotifyModerator::onGetNewMessagesAlert().
-					return $thirdPartyHookResult;
-				}
-			);
-		}
-
 		$result = Hooks::run( 'GetNewMessagesAlert',
 			[ &$newMessagesAlert, $newtalks, $user, $out ] );
 
-		$this->assertEquals( $thirdPartyHookResult ?? true, $result,
+		$this->assertTrue( $result,
 			"Return value of GetNewMessagesAlert hook doesn't match expected." );
 
 		if ( $expectShown ) {
 			$this->assertSame( '{AnotherExistingNotification}{NotificationLink}', $newMessagesAlert,
 				"Our notification wasn't added." );
 		} else {
-			if ( $thirdPartyHookResult === null ) {
-				$this->assertSame( '{AnotherExistingNotification}', $newMessagesAlert,
-					"Text of \$newMessagesAlert was modified when we didn't intend to add our notification." );
-			} else {
-				$this->assertSame( '{Notification From Third-Party Hook}', $newMessagesAlert,
-					"Text of \$newMessagesAlert wasn't modified by third-party hook." );
-			}
+			$this->assertSame( '{AnotherExistingNotification}', $newMessagesAlert,
+				"Text of \$newMessagesAlert was modified when we didn't intend to add our notification." );
 		}
 	}
 
@@ -204,23 +176,13 @@ class ModerationNotifyModeratorTest extends ModerationUnitTestCase {
 
 			// Situation 1: "You have new messages" notification (from user's talkpage) doesn't exist.
 			// Then ModerationNotifyModerator::onGetNewMessagesAlert() must add its own notification.
-			'no "You have new messages", should show our notification' => [ [], true, null ],
+			'no "You have new messages", should show our notification' => [ [], true ],
 
 			// Situation 2: "You have new messages" notification already exists.
 			// Because it is more important than "new changes are awaiting moderation",
 			// in this case we purposely don't show notification of ModerationNotifyModerator.
 			'existing "You have new messages" should suppress our notification' =>
-				[ [ 'something' => 'here' ], false, null ],
-
-			// Situation 3: both "You have new messages" AND third-party handlers of this hook exist
-			// (for example, Extension:Echo adds a handler of GetNewMessagesAlert hook too), and they
-			// were saved under ModerationNotifyModerator::SAVED_HOOK_NAME by onBeforeInitialize.
-			// In this case these saved handlers should be called,
-			// and their return value (true or false) should be returned by our own handler.
-			'existing "You have new messages", no notification. Third-party hook returns true' =>
-				[ [ 'something' => 'here' ], false, true ],
-			'existing "You have new messages",  no notification. Third-party hook returns false' =>
-				[ [ 'something' => 'here' ], false, false ]
+				[ [ 'something' => 'here' ], false ]
 		];
 	}
 
@@ -237,7 +199,6 @@ class ModerationNotifyModeratorTest extends ModerationUnitTestCase {
 		$pendingTimeCached = $opt['pendingTimeCached'] ?? false;
 		$pendingTimeUncached = $opt['pendingTimeUncached'] ?? false;
 		$seenTime = $opt['seenTime'] ?? false;
-		$thirdPartyHooks = $opt['thirdPartyHooks'] ?? [];
 
 		$linkRenderer = $this->createMock( LinkRenderer::class );
 		$entryFactory = $this->createMock( EntryFactory::class );
@@ -289,15 +250,11 @@ class ModerationNotifyModeratorTest extends ModerationUnitTestCase {
 		$notify = new ModerationNotifyModerator( $linkRenderer, $entryFactory, $cache );
 		$this->setService( 'Moderation.NotifyModerator', $notify );
 
-		global $wgHooks;
-		$wgHooks['GetNewMessagesAlert'] = []; // Not cleaned by Hooks::clear(), must clean explicitly.
+		$this->hideDeprecated( 'Hooks::clear' );
 		Hooks::clear( 'GetNewMessagesAlert' );
 
-		foreach ( $thirdPartyHooks as $handler ) {
-			// Only $wgHooks are saved, hooks from Hooks::register() are not.
-			global $wgHooks;
-			$wgHooks['GetNewMessagesAlert'][] = $handler;
-		}
+		$this->hideDeprecated( 'Hooks::clear' );
+		Hooks::clear( 'EchoCanAbortNewMessagesAlert' );
 
 		// Run the tested hook.
 		$unused = null;
@@ -313,20 +270,28 @@ class ModerationNotifyModeratorTest extends ModerationUnitTestCase {
 		}
 
 		if ( !$expectInstalled ) {
-			$this->assertEquals( $thirdPartyHooks, $hooksAfterTest,
-				'Unexpected changes in \$wgHooks when no hooks should have been installed.' );
+			$this->assertNotContains(
+				'ModerationNotifyModerator::onGetNewMessagesAlert',
+				Hooks::getHandlers( 'GetNewMessagesAlert' ),
+				"onGetNewMessagesAlert must NOT be installed."
+			);
+			$this->assertNotContains(
+				'ModerationNotifyModerator::onEchoCanAbortNewMessagesAlert',
+				Hooks::getHandlers( 'EchoCanAbortNewMessagesAlert' ),
+				"onEchoCanAbortNewMessagesAlert must NOT be installed."
+			);
 			return;
 		}
 
-		$this->assertEquals(
-			[ 'ModerationNotifyModerator::onGetNewMessagesAlert' ],
+		$this->assertContains(
+			'ModerationNotifyModerator::onGetNewMessagesAlert',
 			Hooks::getHandlers( 'GetNewMessagesAlert' ),
-			"onGetNewMessagesAlert must be installed and be the only handler of this hook."
+			"onGetNewMessagesAlert must be installed."
 		);
-
-		$this->assertEquals( $thirdPartyHooks,
-			Hooks::getHandlers( ModerationNotifyModerator::SAVED_HOOK_NAME ),
-			"Third-party handlers of GetNewMessagesAlert hook weren't saved."
+		$this->assertContains(
+			'ModerationNotifyModerator::onEchoCanAbortNewMessagesAlert',
+			Hooks::getHandlers( 'EchoCanAbortNewMessagesAlert' ),
+			"onEchoCanAbortNewMessagesAlert must be installed."
 		);
 	}
 
@@ -348,12 +313,6 @@ class ModerationNotifyModeratorTest extends ModerationUnitTestCase {
 					'pendingTimeUncached' => '2010010203040506',
 					'seenTime' => '2015010203040506'
 				] ],
-			'Not installed (SeenTime is newer than the most recent pending edit), have third-party hooks' =>
-				[ false, [
-					'pendingTimeUncached' => '2010010203040506',
-					'seenTime' => '2015010203040506',
-					'thirdPartyHooks' => [ 'fakeHandler1', 'fakeHandler2' ]
-				] ],
 			'Installed (SeenTime is unknown, which means that this moderator hasn\'t visited for a while)' =>
 				[ true, [
 					'pendingTimeUncached' => '2010010203040506',
@@ -369,12 +328,6 @@ class ModerationNotifyModeratorTest extends ModerationUnitTestCase {
 					'pendingTimeCached' => '2010010203040506',
 					'seenTime' => '2005010203040506'
 				] ],
-			'Installed (SeenTime is less than pendingTimeCached), have third-party hooks' =>
-				[ true, [
-					'pendingTimeCached' => '2010010203040506',
-					'seenTime' => '2005010203040506',
-					'thirdPartyHooks' => [ 'fakeHandler1', 'fakeHandler2' ]
-				] ]
 		];
 	}
 

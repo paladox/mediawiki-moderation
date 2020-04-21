@@ -23,6 +23,8 @@ require_once __DIR__ . '/autoload.php';
  */
 
 class ModerationTestsuite {
+	use MediaWikiTestCaseTrait;
+
 	const TEST_PASSWORD = '123456';
 	const DEFAULT_USER_AGENT = 'MediaWiki Moderation Testsuite';
 
@@ -686,6 +688,7 @@ class ModerationTestsuite {
 	 */
 	public function getLastRevision( $title ) {
 		$page = WikiPage::factory( Title::newFromText( $title ) );
+		$this->hideDeprecated( 'WikiPage::getRevision' );
 		$rev = $page->getRevision();
 
 		if ( !$rev ) {

@@ -48,13 +48,6 @@ class ModerationNotifyModerator {
 	}
 
 	/**
-	 * Name of our hook that runs third-party handlers of GetNewMessagesAlert hook,
-	 * but only for "You have new messages" and NOT for "new edits are pending moderation".
-	 * See install() for details.
-	 */
-	const SAVED_HOOK_NAME = 'Moderation__SavedGetNewMessagesAlert';
-
-	/**
 	 * BeforeInitialize hook.
 	 * Here we install GetNewMessagesAlert hook and prevent Extension:Echo from suppressing it.
 	 * @param Title &$title
@@ -127,21 +120,19 @@ class ModerationNotifyModerator {
 	 * Install GetNewMessagesAlert hook. Prevent other handlers from interfering.
 	 */
 	protected function install() {
-		global $wgHooks;
-
-		// Assign existing handlers of GetNewMessagesAlert to SAVED_HOOK_NAME hook.
-		// We will call them in onGetNewMessagesAlert if/when we show "You have new messages"
-		// instead of our notification, but we won't allow them to hide/modify our notification.
-		// For example, Extension:Echo aborts GetNewMessagesAlert hook (always hides the notice).
-		$hookName = 'GetNewMessagesAlert';
-		if ( isset( $wgHooks[$hookName] ) ) {
-			$wgHooks[self::SAVED_HOOK_NAME] = $wgHooks[$hookName];
-			$wgHooks[$hookName] = []; // Delete existing handlers
-		}
-
 		// Install our own handler.
-		$handler = __CLASS__ . '::onGetNewMessagesAlert';
-		Hooks::register( $hookName, $handler );
+		Hooks::register( 'GetNewMessagesAlert', __CLASS__ . '::onGetNewMessagesAlert' );
+		Hooks::register( 'EchoCanAbortNewMessagesAlert', __CLASS__ . '::onEchoCanAbortNewMessagesAlert' );
+	}
+
+	/**
+	 * EchoCanAbortNewMessagesAlert hook. This hook is installed dynamically (NOT via extension.json).
+	 * Here we disallow Extension:Echo to suppress "You have new messages" box (which we use).
+	 * @return false
+	 */
+	public static function onEchoCanAbortNewMessagesAlert() {
+		// Disallowed
+		return false;
 	}
 
 	/**
@@ -160,9 +151,7 @@ class ModerationNotifyModerator {
 	) {
 		if ( $newtalks ) {
 			// Don't suppress "You have new messages" notification, it's more important.
-			// Also call the hooks suppressed in install(), e.g. hook of Extension:Echo.
-			$args = [ &$newMessagesAlert, $newtalks, $user, $out ];
-			return Hooks::run( self::SAVED_HOOK_NAME, $args );
+			return true;
 		}
 
 		/* Need to notify */
